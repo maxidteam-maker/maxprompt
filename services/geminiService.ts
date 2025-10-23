@@ -1,17 +1,12 @@
 import { GoogleGenAI, Modality } from '@google/genai';
 import { ImageAspectRatio, VideoAspectRatio, VideoResolution } from '../types';
 
-export const fileToBase64 = (file: File): Promise<string> => {
+// Helper function to convert File to base64 string
+const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result.split(',')[1]);
-      } else {
-        reject(new Error('Failed to read file as base64 string.'));
-      }
-    };
+    reader.onload = () => resolve((reader.result as string).split(',')[1]);
     reader.onerror = (error) => reject(error);
   });
 };
@@ -21,56 +16,61 @@ export const generateImage = async (
   aspectRatio: ImageAspectRatio,
   imageFile: File | null
 ): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // A new GoogleGenAI instance should be created before each API call to ensure it uses the latest API key.
+  const ai = new GoogleGenAI({});
 
-  // --- EDITING FLOW ---
-  // If an image file is provided, use the multimodal model for editing.
+  // --- IMAGE EDITING LOGIC ---
   if (imageFile) {
-    const base64Image = await fileToBase64(imageFile);
+    const base64Data = await fileToBase64(imageFile);
     const imagePart = {
       inlineData: {
-        data: base64Image,
+        data: base64Data,
         mimeType: imageFile.type,
       },
     };
     const textPart = { text: prompt };
-    const parts = [imagePart, textPart];
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image', // Nano Banana for editing
-      contents: { role: 'user', parts }, // FIX: Add role for better multimodal understanding
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        role: 'user', // Explicitly set the role for multimodal input
+        parts: [imagePart, textPart],
+      },
       config: {
         responseModalities: [Modality.IMAGE],
       },
     });
 
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return part.inlineData.data;
-      }
+    const imageEditPart = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+    if (!imageEditPart?.inlineData) {
+      throw new Error("Image editing failed or no image was returned.");
     }
-    throw new Error('Image editing failed or no image was returned.');
-  }
-  // --- GENERATION FLOW ---
-  // If no image file, use the Imagen model for high-quality generation with guaranteed aspect ratio.
+    const base64ImageBytes: string = imageEditPart.inlineData.data;
+    const mimeType = imageEditPart.inlineData.mimeType;
+    return `data:${mimeType};base64,${base64ImageBytes}`;
+  } 
+  
+  // --- NEW IMAGE GENERATION LOGIC ---
   else {
     const response = await ai.models.generateImages({
-      model: 'imagen-4.0-generate-001', // Imagen for pure generation
+      model: 'imagen-4.0-generate-001',
       prompt: prompt,
       config: {
         numberOfImages: 1,
-        aspectRatio: aspectRatio, // Direct aspect ratio control for perfect results
-        outputMimeType: 'image/png',
+        outputMimeType: 'image/jpeg',
+        aspectRatio: aspectRatio,
       },
     });
 
-    if (response.generatedImages && response.generatedImages.length > 0) {
-      return response.generatedImages[0].image.imageBytes;
+    if (!response.generatedImages || response.generatedImages.length === 0) {
+        throw new Error("Image generation failed or returned no images.");
     }
 
-    throw new Error('Image generation failed or no image was returned.');
+    const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
+    return `data:image/jpeg;base64,${base64ImageBytes}`;
   }
 };
+
 
 export const generateVideo = async (
   prompt: string,
@@ -79,55 +79,54 @@ export const generateVideo = async (
   resolution: VideoResolution,
   setLoadingMessage: (message: string) => void
 ): Promise<Blob> => {
-  // A new instance is created to ensure it uses the most up-to-date API key.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+  // A new GoogleGenAI instance should be created before each API call to ensure it uses the latest API key.
+  const ai = new GoogleGenAI({});
 
-  const config: any = {
-    numberOfVideos: 1,
-    resolution,
-    aspectRatio,
-  };
+  setLoadingMessage('Preparing for generation...');
+  
+  const imagePayload = imageFile ? {
+    imageBytes: await fileToBase64(imageFile),
+    mimeType: imageFile.type,
+  } : undefined;
 
-  let imagePayload;
-  if (imageFile) {
-    setLoadingMessage('Encoding image...');
-    const base64Image = await fileToBase64(imageFile);
-    imagePayload = {
-      imageBytes: base64Image,
-      mimeType: imageFile.type,
-    };
-  }
+  setLoadingMessage('Sending request to the model...');
 
-  setLoadingMessage('Sending request to Gemini...');
   let operation = await ai.models.generateVideos({
     model: 'veo-3.1-fast-generate-preview',
-    prompt: prompt || undefined, // Prompt is optional if image is provided
+    prompt: prompt,
     image: imagePayload,
-    config,
+    config: {
+      numberOfVideos: 1,
+      resolution: resolution,
+      aspectRatio: aspectRatio,
+    },
   });
 
-  setLoadingMessage('Video generation started. This may take a few minutes...');
+  setLoadingMessage('Video generation in progress... this can take a few minutes.');
+
   while (!operation.done) {
-    await new Promise(resolve => setTimeout(resolve, 10000)); // Poll every 10 seconds
-    setLoadingMessage('Checking video status...');
+    await new Promise(resolve => setTimeout(resolve, 10000));
+    setLoadingMessage('Checking generation status...');
     operation = await ai.operations.getVideosOperation({ operation: operation });
   }
 
   const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-
   if (!downloadLink) {
-    throw new Error('Video generation failed or returned no link.');
+    throw new Error('Video generation failed: No download link found.');
   }
 
-  setLoadingMessage('Downloading video...');
-  const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+  setLoadingMessage('Downloading generated video...');
 
+  // The fetch call will automatically use the correct authentication context provided by the environment.
+  const response = await fetch(downloadLink);
   if (!response.ok) {
-    const errorBody = await response.text();
-    console.error('Download error:', errorBody);
-    throw new Error(`Failed to download video: ${response.statusText}`);
+    const errorText = await response.text();
+    // Propagate the error message so the component can check for "Requested entity was not found"
+    // which suggests an API key issue.
+    throw new Error(`Failed to download video: ${response.statusText} - ${errorText}`);
   }
 
-  const videoBlob = await response.blob();
-  return videoBlob;
+  setLoadingMessage('Video processing complete!');
+  return await response.blob();
 };

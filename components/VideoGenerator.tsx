@@ -75,7 +75,8 @@ const VideoGenerator: React.FC = () => {
             <p className="text-gray-400 mb-4 max-w-md">
                 The Veo video model requires you to select your own API key. This is a one-time step.
             </p>
-             <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-sm text-lime-400 hover:underline mb-6">Learn more about billing</a>
+             <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" rel="noopener noreferrer" className="text-sm text-lime-400 hover:underline mb-2">What is an API Key? Learn more.</a>
+             <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-sm text-lime-400 hover:underline mb-6">Learn about billing for Video generation</a>
             <button
                 onClick={handleSelectKey}
                 className="bg-lime-400 text-black font-bold py-2 px-6 rounded-lg hover:bg-lime-500 transition"

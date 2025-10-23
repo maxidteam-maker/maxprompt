@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { generateImage } from '../services/geminiService';
 import { ImageAspectRatio } from '../types';
 import Spinner from './Spinner';
@@ -13,15 +13,31 @@ const ImageGenerator: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+  
+  const [hasApiKey, setHasApiKey] = useState<boolean>(false);
+  
+  const checkApiKey = useCallback(async () => {
+    if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
+      const keyStatus = await window.aistudio.hasSelectedApiKey();
+      setHasApiKey(keyStatus);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkApiKey();
+  }, [checkApiKey]);
+
+  const handleSelectKey = async () => {
+    if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
+      await window.aistudio.openSelectKey();
+      setHasApiKey(true);
+    }
+  };
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() && !imageFile) {
       setError('Please enter a prompt or upload an image to edit.');
-      return;
-    }
-    if (imageFile && !prompt.trim()) {
-      setError('Please enter a prompt to describe your edit.');
       return;
     }
     
@@ -30,38 +46,61 @@ const ImageGenerator: React.FC = () => {
     setGeneratedImageUrl(null);
 
     try {
-      const base64Image = await generateImage(prompt, aspectRatio, imageFile);
-      const url = `data:image/png;base64,${base64Image}`;
+      const url = await generateImage(prompt, aspectRatio, imageFile);
       setGeneratedImageUrl(url);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
       setError(errorMessage);
       console.error(err);
+      if (errorMessage.includes("API key not valid")) {
+        setError("API Key not found or invalid. Please select your API key again.");
+        setHasApiKey(false);
+      }
     } finally {
       setIsLoading(false);
     }
   }, [prompt, aspectRatio, imageFile]);
 
+  if (!hasApiKey) {
+    return (
+        <div className="p-8 text-center flex flex-col items-center justify-center min-h-[400px]">
+            <h2 className="text-xl font-bold text-gray-100 mb-2">API Key Required for Image Generation</h2>
+            <p className="text-gray-400 mb-4 max-w-md">
+                This app requires you to select your own API key to use the image generation and editing features.
+            </p>
+            <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" rel="noopener noreferrer" className="text-sm text-lime-400 hover:underline mb-6">
+                What is an API Key? Learn more.
+            </a>
+            <button
+                onClick={handleSelectKey}
+                className="bg-lime-400 text-black font-bold py-2 px-6 rounded-lg hover:bg-lime-500 transition"
+            >
+                Select API Key
+            </button>
+        </div>
+    );
+  }
+
+  const isEditing = imageFile !== null;
+
   return (
     <div>
       <form onSubmit={handleSubmit}>
         <div className="flex flex-col gap-6">
-          
-          <FileUpload 
+          <FileUpload
             label="1. Upload Image (Optional for Editing)"
             onFileSelect={setImageFile}
             disabled={isLoading}
           />
-
-          <div>
+           <div>
             <label htmlFor="prompt-image" className="block text-sm font-medium text-gray-300 mb-2">
-              {imageFile ? '2. Describe Your Edit' : '2. Describe the Image to Generate'}
+              {isEditing ? '2. Describe Your Edit' : '1. Describe the Image to Generate'}
             </label>
             <textarea
               id="prompt-image"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder={imageFile ? "e.g., add sunglasses to the person" : "e.g., A majestic lion jumping from a fire hoop"}
+              placeholder={isEditing ? "e.g., Add sunglasses to the person" : "e.g., A photorealistic image of a futuristic city"}
               className="w-full h-28 p-3 bg-[#1F1F1F] border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-lime-500 focus:border-lime-500 transition"
               disabled={isLoading}
             />
@@ -69,14 +108,13 @@ const ImageGenerator: React.FC = () => {
           
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-                Aspect Ratio
-                {imageFile && <span className="text-gray-400 font-normal text-xs ml-2">(Disabled when editing an image)</span>}
+              Aspect Ratio 
+              {isEditing && <span className="text-xs text-gray-500 ml-2">(Follows original image)</span>}
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {Object.values(ImageAspectRatio).map(ratio => (
                     <button type="button" key={ratio} onClick={() => setAspectRatio(ratio)}
-                    className={`py-2 px-4 rounded-lg font-semibold text-sm transition ${aspectRatio === ratio ? 'bg-lime-400 text-black' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'} disabled:opacity-50 disabled:cursor-not-allowed`} 
-                    disabled={isLoading || !!imageFile}>
+                    className={`flex-1 py-2 px-4 rounded-lg font-semibold text-sm transition ${aspectRatio === ratio ? 'bg-lime-400 text-black' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'} ${isEditing ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={isLoading || isEditing}>
                         {ratio}
                     </button>
                 ))}
@@ -85,20 +123,10 @@ const ImageGenerator: React.FC = () => {
 
           <button
             type="submit"
-            disabled={isLoading || (!prompt && !imageFile)}
+            disabled={isLoading || (!prompt.trim() && !imageFile)}
             className="w-full flex items-center justify-center gap-2 bg-lime-400 text-black font-bold py-3 px-4 rounded-lg hover:bg-lime-500 transition-transform duration-150 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
           >
-            {isLoading ? (
-                <>
-                    <Spinner className="w-5 h-5" />
-                    {imageFile ? 'Applying Edits...' : 'Generating Image...'}
-                </>
-            ) : (
-                <>
-                    <SparklesIcon className="w-5 h-5" />
-                    {imageFile ? 'Generate Edited Image' : 'Generate New Image'}
-                </>
-            )}
+            {isLoading ? <><Spinner className="w-5 h-5" /> sabar lur, lagi proses</> : <><SparklesIcon className="w-5 h-5" /> {isEditing ? 'Generate Edited Image' : 'Generate New Image'}</>}
           </button>
         </div>
       </form>
@@ -114,10 +142,10 @@ const ImageGenerator: React.FC = () => {
         )}
         {generatedImageUrl && (
           <div className="relative group">
-            <img src={generatedImageUrl} alt="Generated" className="w-full rounded-lg shadow-lg" />
+            <img src={generatedImageUrl} alt="Generated image" className="w-full rounded-lg shadow-lg" />
             <a 
               href={generatedImageUrl} 
-              download={`ai-imageedit-image-${Date.now()}.png`} 
+              download={`maxprompt-image-${Date.now()}.jpeg`} 
               className="absolute bottom-4 right-4 bg-black/50 text-white py-2 px-4 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
             >
               Download
