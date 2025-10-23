@@ -1,13 +1,73 @@
-import { GoogleGenAI } from "@google/genai";
+import { ImageAspectRatio, VideoAspectRatio, VideoResolution } from "../types";
 
-/**
- * Creates and returns a new GoogleGenAI client instance.
- * As per guidelines for features that use the API key selection dialog (like Veo),
- * a new client should be instantiated before each API call to ensure the latest key is used.
- * This function centralizes client creation.
- */
-export const getGeminiClient = () => {
-    // The API key is expected to be populated in process.env.API_KEY by the environment,
-    // potentially after user selection via window.aistudio.
-    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+const fileToArrayBuffer = (file: File): Promise<ArrayBuffer> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsArrayBuffer(file);
+        reader.onload = () => resolve(reader.result as ArrayBuffer);
+        reader.onerror = (error) => reject(error);
+    });
+};
+
+export const generateImage = async (
+    apiKey: string,
+    prompt: string,
+    aspectRatio: ImageAspectRatio,
+    imageFile?: File | null
+) : Promise<string> => {
+    const formData = new FormData();
+    formData.append('prompt', prompt);
+    formData.append('aspectRatio', aspectRatio);
+    if (imageFile) {
+        formData.append('image', imageFile);
+    }
+
+    const response = await fetch('/api/generateImage', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${apiKey}`
+        },
+        body: formData,
+    });
+    
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate image');
+    }
+
+    return data.imageUrl;
+};
+
+
+export const generateVideo = async (
+    apiKey: string,
+    prompt: string,
+    aspectRatio: VideoAspectRatio,
+    resolution: VideoResolution,
+    imageFile?: File | null
+) : Promise<string> => {
+    const formData = new FormData();
+    formData.append('prompt', prompt);
+    formData.append('aspectRatio', aspectRatio);
+    formData.append('resolution', resolution);
+    if (imageFile) {
+        formData.append('image', imageFile);
+    }
+
+    const response = await fetch('/api/generateVideo', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${apiKey}`
+        },
+        body: formData,
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate video');
+    }
+    
+    const videoBlob = await response.blob();
+    return URL.createObjectURL(videoBlob);
 };

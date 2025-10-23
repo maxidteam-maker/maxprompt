@@ -1,22 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { generateVideo } from '../api/generateVideo';
+import React, { useState } from 'react';
+import { generateVideo } from '../services/geminiService';
 import { VideoAspectRatio, VideoResolution } from '../types';
 import { SparklesIcon } from './icons';
 import Spinner from './Spinner';
 import FileUpload from './FileUpload';
-import ApiKeyModal from './ApiKeyModal';
 
-// Helper to convert File to base64
-const fileToBase64 = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve((reader.result as string).split(',')[1]);
-    reader.onerror = (error) => reject(error);
-  });
-};
+interface VideoGeneratorProps {
+    apiKey: string;
+}
 
-const VideoGenerator: React.FC = () => {
+const VideoGenerator: React.FC<VideoGeneratorProps> = ({ apiKey }) => {
   const [prompt, setPrompt] = useState('');
   const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>(VideoAspectRatio.Landscape);
   const [resolution, setResolution] = useState<VideoResolution>(VideoResolution.SD);
@@ -24,41 +17,14 @@ const VideoGenerator: React.FC = () => {
   
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('Generating your video...');
+  const [loadingMessage, setLoadingMessage] = useState('sabar lur, lagi proses');
   const [error, setError] = useState<string | null>(null);
   
-  const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
-
-  useEffect(() => {
-    const checkApiKey = async () => {
-      // This is a global object provided by the environment
-      // @ts-ignore
-      if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
-        setIsKeyModalOpen(true);
-      }
-    };
-    checkApiKey();
-  }, []);
-
-  const handleSelectKey = async () => {
-    // @ts-ignore
-    await window.aistudio.openSelectKey();
-    // Assume key selection is successful and close modal.
-    // A failed API call later will re-trigger the check.
-    setIsKeyModalOpen(false);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() && !imageFile) {
       setError('Please enter a prompt or upload an image.');
       return;
-    }
-    
-    // @ts-ignore
-    if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
-        setIsKeyModalOpen(true);
-        return;
     }
 
     setIsLoading(true);
@@ -67,32 +33,19 @@ const VideoGenerator: React.FC = () => {
     setLoadingMessage('Initializing video generation...');
 
     try {
-      let imagePayload;
-      if (imageFile) {
-        setLoadingMessage('Processing uploaded image...');
-        const base64 = await fileToBase64(imageFile);
-        imagePayload = { base64, mimeType: imageFile.type };
-      }
-
       setLoadingMessage('Sending request to Gemini... This can take a few minutes.');
-      const videoUrl = await generateVideo({
+      const videoUrl = await generateVideo(
+        apiKey,
         prompt,
         aspectRatio,
         resolution,
-        image: imagePayload,
-      });
+        imageFile,
+      );
       setGeneratedVideoUrl(videoUrl);
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
       setError(errorMessage);
-      // As per guidelines, if the error indicates a missing key, re-prompt the user.
-      if (errorMessage.includes("Requested entity was not found")) {
-          // @ts-ignore
-          if (window.aistudio) {
-            setIsKeyModalOpen(true);
-          }
-      }
     } finally {
       setIsLoading(false);
     }
@@ -100,11 +53,6 @@ const VideoGenerator: React.FC = () => {
 
   return (
     <div>
-      <ApiKeyModal
-        isOpen={isKeyModalOpen}
-        onClose={() => setIsKeyModalOpen(false)}
-        onSelectKey={handleSelectKey}
-      />
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
@@ -168,7 +116,7 @@ const VideoGenerator: React.FC = () => {
         </button>
       </form>
 
-      {error && <div className="mt-4 text-center text-red-400 bg-red-900/50 p-3 rounded-lg">{error}</div>}
+      {error && <div className="mt-4 text-center text-red-400 bg-red-900/50 p-3 rounded-lg break-words">{error}</div>}
 
       <div className="mt-6">
         {isLoading && (
