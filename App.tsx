@@ -15,8 +15,8 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#121212] text-white font-sans flex flex-col items-center p-4 sm:p-6 lg:p-8">
       <header className="w-full max-w-4xl text-center mb-8">
-        <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-white">
-          MaxPrompt
+        <h1 className="text-4xl sm:text-6xl font-bold tracking-wider text-lime-400">
+          MAXPROMPT
         </h1>
       </header>
 
@@ -52,7 +52,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="w-full max-w-4xl text-center mt-12 text-gray-500">
-        <p>&copy; {new Date().getFullYear()} MaxPrompt. Powered by Google Gemini.</p>
+        <p>&copy; {new Date().getFullYear()} MAXPROMPT. Powered by Google Gemini.</p>
       </footer>
     </div>
   );
