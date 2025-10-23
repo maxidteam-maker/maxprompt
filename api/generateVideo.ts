@@ -31,9 +31,9 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 
 export async function POST(request: Request) {
     try {
-        const apiKey = request.headers.get('Authorization')?.split('Bearer ')[1];
+        const apiKey = process.env.API_KEY;
         if (!apiKey) {
-            return new Response(JSON.stringify({ error: "API key is missing" }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({ error: "API key is not configured on the server" }), { status: 500, headers: { 'Content-Type': 'application/json' } });
         }
         
         const ai = new GoogleGenAI({ apiKey });
@@ -78,9 +78,8 @@ export async function POST(request: Request) {
         if (!downloadLink) {
             throw new Error('Video generation finished, but no download link was provided.');
         }
-
-        // Fetch the video using the link (the key is already part of the signed URL from the operation)
-        const videoResponse = await fetch(downloadLink);
+        
+        const videoResponse = await fetch(`${downloadLink}&key=${apiKey}`);
         if (!videoResponse.ok) {
             throw new Error(`Failed to download the generated video. Status: ${videoResponse.status}`);
         }

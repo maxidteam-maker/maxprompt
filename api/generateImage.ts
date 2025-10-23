@@ -34,9 +34,9 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 
 export async function POST(request: Request) {
   try {
-    const apiKey = request.headers.get('Authorization')?.split('Bearer ')[1];
+    const apiKey = process.env.API_KEY;
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: "API key is missing" }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: "API key is not configured on the server" }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
     
     const ai = new GoogleGenAI({ apiKey });
@@ -46,8 +46,9 @@ export async function POST(request: Request) {
     const aspectRatio = formData.get('aspectRatio') as ImageAspectRatio;
     const imageFile = formData.get('image') as File | null;
 
-    if (!prompt) {
-        return new Response(JSON.stringify({ error: "Prompt is missing" }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    // Although prompt is optional for editing, we require it for generation.
+    if (!prompt && !imageFile) {
+        return new Response(JSON.stringify({ error: "Prompt is required for new image generation" }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
 
     let imageUrl: string;
@@ -79,6 +80,9 @@ export async function POST(request: Request) {
         }
     } else {
         // --- NEW IMAGE GENERATION LOGIC (IMAGEN) ---
+        if (!prompt) {
+             return new Response(JSON.stringify({ error: "Prompt is required" }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+        }
         const response = await ai.models.generateImages({
             model: 'imagen-4.0-generate-001',
             prompt: prompt,

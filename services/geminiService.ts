@@ -10,7 +10,6 @@ const fileToArrayBuffer = (file: File): Promise<ArrayBuffer> => {
 };
 
 export const generateImage = async (
-    apiKey: string,
     prompt: string,
     aspectRatio: ImageAspectRatio,
     imageFile?: File | null
@@ -24,9 +23,6 @@ export const generateImage = async (
 
     const response = await fetch('/api/generateImage', {
         method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${apiKey}`
-        },
         body: formData,
     });
     
@@ -41,7 +37,6 @@ export const generateImage = async (
 
 
 export const generateVideo = async (
-    apiKey: string,
     prompt: string,
     aspectRatio: VideoAspectRatio,
     resolution: VideoResolution,
@@ -57,9 +52,6 @@ export const generateVideo = async (
 
     const response = await fetch('/api/generateVideo', {
         method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${apiKey}`
-        },
         body: formData,
     });
 

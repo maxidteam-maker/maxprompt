@@ -1,32 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ImageIcon, VideoIcon } from './components/icons';
 import TabButton from './components/TabButton';
 import { GeneratorTab } from './types';
 import ImageGenerator from './components/ImageGenerator';
 import VideoGenerator from './components/VideoGenerator';
-import ApiKeyModal from './components/ApiKeyModal';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<GeneratorTab>(GeneratorTab.Image);
-  const [apiKey, setApiKey] = useState<string | null>(null);
-
-  useEffect(() => {
-    const storedApiKey = localStorage.getItem('gemini-api-key');
-    if (storedApiKey) {
-      setApiKey(storedApiKey);
-    }
-  }, []);
-
-  const handleApiKeySave = (key: string) => {
-    if (key) {
-      localStorage.setItem('gemini-api-key', key);
-      setApiKey(key);
-    }
-  };
-
-  if (!apiKey) {
-    return <ApiKeyModal onKeySubmit={handleApiKeySave} />;
-  }
 
   return (
     <div className="min-h-screen text-white p-4 sm:p-6 md:p-8 flex flex-col font-sans">
@@ -61,10 +41,10 @@ const App: React.FC = () => {
 
           <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-4 sm:p-6 rounded-lg shadow-2xl transition-all duration-300">
             <div className={activeTab === GeneratorTab.Image ? 'block' : 'hidden'}>
-              <ImageGenerator apiKey={apiKey} />
+              <ImageGenerator />
             </div>
             <div className={activeTab === GeneratorTab.Video ? 'block' : 'hidden'}>
-              <VideoGenerator apiKey={apiKey} />
+              <VideoGenerator />
             </div>
           </div>
         </div>

@@ -1,92 +1,95 @@
 import React, { useState } from 'react';
 import { generateImage } from '../services/geminiService';
 import { ImageAspectRatio } from '../types';
-import { SparklesIcon } from './icons';
-import Spinner from './Spinner';
 import FileUpload from './FileUpload';
+import Spinner from './Spinner';
+import { SparklesIcon } from './icons';
 
-interface ImageGeneratorProps {
-  apiKey: string;
-}
-
-const ImageGenerator: React.FC<ImageGeneratorProps> = ({ apiKey }) => {
+const ImageGenerator: React.FC = () => {
   const [prompt, setPrompt] = useState('');
   const [aspectRatio, setAspectRatio] = useState<ImageAspectRatio>(ImageAspectRatio.Square);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  
-  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resultImage, setResultImage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prompt.trim()) {
-      setError('Please enter a prompt.');
+    if (!prompt && !imageFile) {
+      setError('Please describe the image or upload one to edit.');
       return;
     }
-    setIsLoading(true);
-    setGeneratedImage(null);
+    setLoading(true);
     setError(null);
+    setResultImage(null);
+
     try {
-      const imageUrl = await generateImage(apiKey, prompt, aspectRatio, imageFile);
-      setGeneratedImage(imageUrl);
+      const imageUrl = await generateImage(prompt, aspectRatio, imageFile);
+      setResultImage(imageUrl);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'An unexpected error occurred.';
-      // Simple parsing for JSON error strings from the backend
-      try {
-        const parsedError = JSON.parse(message);
-        setError(parsedError.error?.message || message);
-      } catch {
-        setError(message);
+       if (err instanceof Error) {
+          if (err.message.toLowerCase().includes('quota')) {
+              setError('Error: Kuota API Key Anda telah habis atau perlu aktivasi billing di akun Google Cloud Anda. Ini bukan kesalahan aplikasi, silakan periksa detail akun Google Anda.');
+          } else {
+              setError(err.message);
+          }
+      } else {
+          setError('An unknown error occurred.');
       }
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
-
-  const isEditing = !!imageFile;
+  
+  const labelText = imageFile 
+    ? "2. Describe Your Edit (Optional)" 
+    : "1. Describe the Image to Generate";
+  
+  const buttonText = imageFile 
+    ? (loading ? 'Editing Image...' : 'Generate Edited Image')
+    : (loading ? 'Generating...' : 'Generate New Image');
 
   return (
-    <div>
+    <div className="space-y-6">
       <form onSubmit={handleSubmit} className="space-y-6">
-        <FileUpload
-            label={isEditing ? '1. Image to Edit' : '1. Upload Image (Optional for Editing)'}
-            onFileSelect={setImageFile}
-            disabled={isLoading}
+        
+        <FileUpload 
+          onFileSelect={setImageFile}
+          label="1. Upload Image (Optional for Editing)"
+          disabled={loading}
         />
         
         <div>
           <label htmlFor="prompt" className="block text-sm font-medium text-gray-300 mb-2">
-            {isEditing ? '2. Describe Your Edit' : '2. Describe the Image to Generate'}
+            {labelText}
           </label>
           <textarea
             id="prompt"
             rows={3}
-            className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-500 focus:ring-lime-500 focus:border-lime-500 transition"
-            placeholder={isEditing ? "e.g., add sunglasses to the person" : "e.g., A cute cat astronaut on the moon"}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            disabled={isLoading}
+            className="w-full bg-gray-900/50 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-lime-500 focus:outline-none transition"
+            placeholder={imageFile ? "e.g., add sunglasses to the person" : "e.g., A cat wearing a wizard hat"}
+            disabled={loading}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Aspect Ratio 
-            {isEditing && <span className="text-xs text-gray-500"> (disabled for editing)</span>}
-          </label>
-          <div className="grid grid-cols-4 gap-2">
+           <label className={`block text-sm font-medium mb-2 transition-colors ${imageFile ? 'text-gray-500' : 'text-gray-300'}`}>
+            Aspect Ratio {imageFile && '(Disabled during edit)'}
+            </label>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {Object.values(ImageAspectRatio).map((ratio) => (
               <button
                 key={ratio}
                 type="button"
                 onClick={() => setAspectRatio(ratio)}
-                disabled={isLoading || isEditing}
-                className={`p-2 rounded-lg text-sm font-semibold transition ${
+                disabled={loading || !!imageFile}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
                   aspectRatio === ratio
-                    ? 'bg-lime-500 text-gray-900'
-                    : 'bg-gray-700 hover:bg-gray-600'
-                } disabled:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50`}
+                    ? 'bg-lime-500 text-gray-900 ring-2 ring-lime-400'
+                    : 'bg-gray-700 hover:bg-gray-600 text-white disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed'
+                }`}
               >
                 {ratio}
               </button>
@@ -96,29 +99,32 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({ apiKey }) => {
 
         <button
           type="submit"
-          disabled={isLoading || !prompt.trim()}
-          className="w-full flex items-center justify-center gap-2 bg-lime-500 text-gray-900 font-bold py-3 px-4 rounded-lg hover:bg-lime-600 transition disabled:bg-gray-600 disabled:cursor-not-allowed"
+          disabled={loading || (!prompt && !imageFile)}
+          className="w-full flex justify-center items-center gap-2 bg-lime-500 hover:bg-lime-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-gray-900 font-bold py-3 px-4 rounded-lg transition-colors"
         >
-          {isLoading ? <Spinner className="w-6 h-6" /> : <SparklesIcon className="w-6 h-6" />}
-          {isLoading ? 'sabar lur, lagi proses' : (isEditing ? 'Generate Edited Image' : 'Generate New Image')}
+          {loading ? <Spinner className="w-6 h-6" /> : <SparklesIcon className="w-6 h-6" />}
+          {buttonText}
         </button>
       </form>
 
-      {error && <div className="mt-4 text-center text-red-400 bg-red-900/50 p-3 rounded-lg break-words">{error}</div>}
+      {error && <div className="mt-4 text-red-300 bg-red-900/50 p-4 rounded-lg text-sm">{error}</div>}
 
-      <div className="mt-6">
-        {isLoading && (
-            <div className="flex flex-col items-center justify-center bg-gray-900/50 rounded-lg p-8 min-h-[200px]">
-                <Spinner />
-                <p className="mt-4 text-gray-400">sabar lur, lagi proses...</p>
-            </div>
-        )}
-        {generatedImage && (
-          <div className="rounded-lg overflow-hidden bg-gray-900">
-            <img src={generatedImage} alt="Generated" className="w-full h-auto" />
+
+      {resultImage && (
+        <div className="mt-6 animate-fade-in">
+          <h3 className="text-lg font-semibold mb-2">Result:</h3>
+          <div className="w-full overflow-hidden rounded-lg bg-gray-800/50">
+            <img src={resultImage} alt="Generated" className="w-full h-full object-contain" />
           </div>
-        )}
-      </div>
+           <a
+              href={resultImage}
+              download={`maxprompt_${Date.now()}.png`}
+              className="mt-4 inline-block w-full text-center bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition"
+            >
+              Download Image
+            </a>
+        </div>
+      )}
     </div>
   );
 };
