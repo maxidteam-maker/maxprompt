@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { generateVideo } from '../services/geminiService';
 import { VideoAspectRatio, VideoResolution } from '../types';
 import Spinner from './Spinner';
@@ -15,28 +15,6 @@ const VideoGenerator: React.FC = () => {
   const [loadingMessage, setLoadingMessage] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
-  
-  const [hasApiKey, setHasApiKey] = useState<boolean>(false);
-  
-  const checkApiKey = useCallback(async () => {
-    if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
-      const keyStatus = await window.aistudio.hasSelectedApiKey();
-      setHasApiKey(keyStatus);
-    }
-  }, []);
-
-  useEffect(() => {
-    checkApiKey();
-  }, [checkApiKey]);
-
-  const handleSelectKey = async () => {
-    if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
-      await window.aistudio.openSelectKey();
-      // Assume success to avoid race condition and allow user to proceed.
-      // The API call itself will fail if the key is invalid.
-      setHasApiKey(true);
-    }
-  };
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,34 +36,11 @@ const VideoGenerator: React.FC = () => {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
       setError(errorMessage);
       console.error(err);
-      if (errorMessage.includes("Requested entity was not found")) {
-        setError("API Key not found or invalid. Please select your API key again.");
-        setHasApiKey(false);
-      }
     } finally {
       setIsLoading(false);
       setLoadingMessage('');
     }
   }, [prompt, imageFile, aspectRatio, resolution]);
-
-  if (!hasApiKey) {
-    return (
-        <div className="p-8 text-center flex flex-col items-center justify-center min-h-[400px]">
-            <h2 className="text-xl font-bold text-gray-100 mb-2">API Key Required for Video Generation</h2>
-            <p className="text-gray-400 mb-4 max-w-md">
-                The Veo video model requires you to select your own API key. This is a one-time step.
-            </p>
-             <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" rel="noopener noreferrer" className="text-sm text-lime-400 hover:underline mb-2">What is an API Key? Learn more.</a>
-             <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-sm text-lime-400 hover:underline mb-6">Learn about billing for Video generation</a>
-            <button
-                onClick={handleSelectKey}
-                className="bg-lime-400 text-black font-bold py-2 px-6 rounded-lg hover:bg-lime-500 transition"
-            >
-                Select API Key
-            </button>
-        </div>
-    );
-  }
 
   return (
     <div>
