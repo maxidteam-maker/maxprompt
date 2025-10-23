@@ -1,65 +1,13 @@
-import { ImageAspectRatio, VideoAspectRatio, VideoResolution } from '../types';
+import { GoogleGenAI } from "@google/genai";
 
-export const generateImage = async (
-  prompt: string,
-  aspectRatio: ImageAspectRatio,
-  imageFile: File | null
-): Promise<string> => {
-    const formData = new FormData();
-    formData.append('prompt', prompt);
-    formData.append('aspectRatio', aspectRatio);
-    if (imageFile) {
-        formData.append('imageFile', imageFile);
-    }
-
-    const response = await fetch('/api/generateImage', {
-        method: 'POST',
-        body: formData,
-    });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-        throw new Error(result.error || 'Failed to generate image.');
-    }
-
-    return `data:${result.mimeType};base64,${result.base64Image}`;
-};
-
-
-export const generateVideo = async (
-  prompt: string,
-  imageFile: File | null,
-  aspectRatio: VideoAspectRatio,
-  resolution: VideoResolution,
-  setLoadingMessage: (message: string) => void // This can be used for more granular updates if needed
-): Promise<Blob> => {
-    
-    const formData = new FormData();
-    formData.append('prompt', prompt);
-    formData.append('aspectRatio', aspectRatio);
-    formData.append('resolution', resolution);
-    if (imageFile) {
-        formData.append('imageFile', imageFile);
-    }
-    
-    setLoadingMessage('Sending request to the server...');
-
-    const response = await fetch('/api/generateVideo', {
-        method: 'POST',
-        body: formData,
-    });
-
-    if (!response.ok) {
-        // Try to parse error from JSON, otherwise use status text
-        try {
-            const result = await response.json();
-            throw new Error(result.error || 'Failed to generate video.');
-        } catch (e) {
-            throw new Error(response.statusText || 'Failed to generate video.');
-        }
-    }
-    
-    setLoadingMessage('Video processing complete!');
-    return await response.blob();
+/**
+ * Creates and returns a new GoogleGenAI client instance.
+ * As per guidelines for features that use the API key selection dialog (like Veo),
+ * a new client should be instantiated before each API call to ensure the latest key is used.
+ * This function centralizes client creation.
+ */
+export const getGeminiClient = () => {
+    // The API key is expected to be populated in process.env.API_KEY by the environment,
+    // potentially after user selection via window.aistudio.
+    return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };

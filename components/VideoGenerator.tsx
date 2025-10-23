@@ -1,124 +1,186 @@
-import React, { useState, useCallback } from 'react';
-import { generateVideo } from '../services/geminiService';
+import React, { useState, useEffect } from 'react';
+import { generateVideo } from '../api/generateVideo';
 import { VideoAspectRatio, VideoResolution } from '../types';
-import Spinner from './Spinner';
 import { SparklesIcon } from './icons';
+import Spinner from './Spinner';
 import FileUpload from './FileUpload';
+import ApiKeyModal from './ApiKeyModal';
+
+// Helper to convert File to base64
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve((reader.result as string).split(',')[1]);
+    reader.onerror = (error) => reject(error);
+  });
+};
 
 const VideoGenerator: React.FC = () => {
-  const [prompt, setPrompt] = useState<string>('');
-  const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>(VideoAspectRatio.Portrait);
+  const [prompt, setPrompt] = useState('');
+  const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>(VideoAspectRatio.Landscape);
   const [resolution, setResolution] = useState<VideoResolution>(VideoResolution.SD);
   const [imageFile, setImageFile] = useState<File | null>(null);
-
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [loadingMessage, setLoadingMessage] = useState<string>('');
-  const [error, setError] = useState<string | null>(null);
+  
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Generating your video...');
+  const [error, setError] = useState<string | null>(null);
+  
+  const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+  useEffect(() => {
+    const checkApiKey = async () => {
+      // This is a global object provided by the environment
+      // @ts-ignore
+      if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
+        setIsKeyModalOpen(true);
+      }
+    };
+    checkApiKey();
+  }, []);
+
+  const handleSelectKey = async () => {
+    // @ts-ignore
+    await window.aistudio.openSelectKey();
+    // Assume key selection is successful and close modal.
+    // A failed API call later will re-trigger the check.
+    setIsKeyModalOpen(false);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() && !imageFile) {
-      setError('Please enter a prompt or upload a starting image.');
+      setError('Please enter a prompt or upload an image.');
       return;
     }
     
+    // @ts-ignore
+    if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
+        setIsKeyModalOpen(true);
+        return;
+    }
+
     setIsLoading(true);
-    setError(null);
     setGeneratedVideoUrl(null);
-    setLoadingMessage("Preparing for generation...");
+    setError(null);
+    setLoadingMessage('Initializing video generation...');
 
     try {
-      const videoBlob = await generateVideo(prompt, imageFile, aspectRatio, resolution, setLoadingMessage);
-      const url = URL.createObjectURL(videoBlob);
-      setGeneratedVideoUrl(url);
+      let imagePayload;
+      if (imageFile) {
+        setLoadingMessage('Processing uploaded image...');
+        const base64 = await fileToBase64(imageFile);
+        imagePayload = { base64, mimeType: imageFile.type };
+      }
+
+      setLoadingMessage('Sending request to Gemini... This can take a few minutes.');
+      const videoUrl = await generateVideo({
+        prompt,
+        aspectRatio,
+        resolution,
+        image: imagePayload,
+      });
+      setGeneratedVideoUrl(videoUrl);
+
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
       setError(errorMessage);
-      console.error(err);
+      // As per guidelines, if the error indicates a missing key, re-prompt the user.
+      if (errorMessage.includes("Requested entity was not found")) {
+          // @ts-ignore
+          if (window.aistudio) {
+            setIsKeyModalOpen(true);
+          }
+      }
     } finally {
       setIsLoading(false);
-      setLoadingMessage('');
     }
-  }, [prompt, imageFile, aspectRatio, resolution]);
+  };
 
   return (
     <div>
+      <ApiKeyModal
+        isOpen={isKeyModalOpen}
+        onClose={() => setIsKeyModalOpen(false)}
+        onSelectKey={handleSelectKey}
+      />
       <form onSubmit={handleSubmit}>
-        <div className="flex flex-col gap-6">
-          <div>
-            <label htmlFor="prompt-video" className="block text-sm font-medium text-gray-300 mb-2">Video Prompt</label>
-            <textarea
-              id="prompt-video"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="e.g., A dynamic shot of a product being used, UGC style, bright lighting"
-              className="w-full h-28 p-3 bg-[#1F1F1F] border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-lime-500 focus:border-lime-500 transition"
-              disabled={isLoading}
-            />
-          </div>
-
-          <FileUpload 
-            label="Starting Image (Optional)"
-            onFileSelect={setImageFile}
-            disabled={isLoading}
-          />
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Aspect Ratio</label>
-                <div className="flex gap-2">
-                    {Object.values(VideoAspectRatio).map(ratio => (
-                        <button type="button" key={ratio} onClick={() => setAspectRatio(ratio)}
-                        className={`flex-1 py-2 px-4 rounded-lg font-semibold text-sm transition ${aspectRatio === ratio ? 'bg-lime-400 text-black' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`} disabled={isLoading}>
-                            {ratio === '9:16' ? 'Portrait' : 'Landscape'}
-                        </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="prompt-video" className="block text-sm font-medium text-gray-300 mb-2">
+                Prompt (optional if image is provided)
+              </label>
+              <textarea
+                id="prompt-video"
+                rows={3}
+                className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-500 focus:ring-lime-500 focus:border-lime-500 transition"
+                placeholder="e.g., A futuristic city with flying cars"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+            <div>
+                <label htmlFor="aspect-ratio-video" className="block text-sm font-medium text-gray-300 mb-2">
+                    Aspect Ratio
+                </label>
+                <select
+                    id="aspect-ratio-video"
+                    className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white focus:ring-lime-500 focus:border-lime-500 transition"
+                    value={aspectRatio}
+                    onChange={(e) => setAspectRatio(e.target.value as VideoAspectRatio)}
+                    disabled={isLoading}
+                >
+                    {Object.values(VideoAspectRatio).map((ratio) => (
+                    <option key={ratio} value={ratio}>{ratio}</option>
                     ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Resolution</label>
-                 <div className="flex gap-2">
-                    {Object.values(VideoResolution).map(res => (
-                        <button type="button" key={res} onClick={() => setResolution(res)}
-                        className={`flex-1 py-2 px-4 rounded-lg font-semibold text-sm transition ${resolution === res ? 'bg-lime-400 text-black' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`} disabled={isLoading}>
-                            {res}
-                        </button>
+                </select>
+            </div>
+             <div>
+                <label htmlFor="resolution-video" className="block text-sm font-medium text-gray-300 mb-2">
+                    Resolution
+                </label>
+                <select
+                    id="resolution-video"
+                    className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white focus:ring-lime-500 focus:border-lime-500 transition"
+                    value={resolution}
+                    onChange={(e) => setResolution(e.target.value as VideoResolution)}
+                    disabled={isLoading}
+                >
+                    {Object.values(VideoResolution).map((res) => (
+                    <option key={res} value={res}>{res}</option>
                     ))}
-                </div>
-              </div>
+                </select>
+            </div>
           </div>
-
-          <button
-            type="submit"
-            disabled={isLoading || (!prompt.trim() && !imageFile)}
-            className="w-full flex items-center justify-center gap-2 bg-lime-400 text-black font-bold py-3 px-4 rounded-lg hover:bg-lime-500 transition-transform duration-150 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
-          >
-            {isLoading ? <><Spinner className="w-5 h-5" /> Generating Video...</> : <><SparklesIcon className="w-5 h-5" /> Generate Video</>}
-          </button>
+          <FileUpload label="Starting Image (optional)" onFileSelect={setImageFile} disabled={isLoading} />
         </div>
+        
+        <button
+          type="submit"
+          disabled={isLoading || (!prompt.trim() && !imageFile)}
+          className="w-full mt-6 flex items-center justify-center gap-2 bg-lime-500 text-gray-900 font-bold py-3 px-4 rounded-lg hover:bg-lime-600 transition disabled:bg-gray-600 disabled:cursor-not-allowed"
+        >
+          {isLoading ? <Spinner className="w-6 h-6" /> : <SparklesIcon className="w-6 h-6" />}
+          {isLoading ? 'Generating...' : 'Generate Video'}
+        </button>
       </form>
 
-      {error && <div className="mt-6 p-4 bg-red-900/50 border border-red-700 text-red-300 rounded-lg">{error}</div>}
+      {error && <div className="mt-4 text-center text-red-400 bg-red-900/50 p-3 rounded-lg">{error}</div>}
 
-      <div className="mt-8">
+      <div className="mt-6">
         {isLoading && (
-          <div className="w-full aspect-video bg-gray-800/50 rounded-lg flex flex-col items-center justify-center gap-4 text-gray-300">
-            <Spinner className="w-12 h-12" />
-            <p className="font-semibold text-lg">sabar lur, lagi proses</p>
-            <p className="text-sm text-gray-400">{loadingMessage}</p>
-          </div>
+            <div className="flex flex-col items-center justify-center bg-gray-900/50 rounded-lg p-8">
+                <Spinner />
+                <p className="mt-4 text-gray-400">{loadingMessage}</p>
+                <p className="mt-2 text-sm text-gray-500">Video generation is a lengthy process. Please be patient.</p>
+            </div>
         )}
         {generatedVideoUrl && (
-          <div className="relative group">
-            <video src={generatedVideoUrl} controls autoPlay loop className="w-full rounded-lg shadow-lg" />
-            <a 
-              href={generatedVideoUrl} 
-              download={`ai-imageedit-video-${Date.now()}.mp4`} 
-              className="absolute bottom-4 right-4 bg-black/50 text-white py-2 px-4 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              Download
-            </a>
+          <div className="rounded-lg overflow-hidden bg-gray-900">
+            <video src={generatedVideoUrl} controls autoPlay loop className="w-full h-auto" />
           </div>
         )}
       </div>

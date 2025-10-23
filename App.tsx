@@ -1,59 +1,51 @@
-import React, { useState, useCallback } from 'react';
-import ImageGenerator from './components/ImageGenerator';
-import VideoGenerator from './components/VideoGenerator';
+import React, { useState } from 'react';
+import { ImageIcon, VideoIcon } from './components/icons';
 import TabButton from './components/TabButton';
 import { GeneratorTab } from './types';
-import { ImageIcon, VideoIcon } from './components/icons';
+import ImageGenerator from './components/ImageGenerator';
+import VideoGenerator from './components/VideoGenerator';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<GeneratorTab>(GeneratorTab.Image);
 
-  const handleTabChange = useCallback((tab: GeneratorTab) => {
-    setActiveTab(tab);
-  }, []);
-
   return (
-    <div className="min-h-screen bg-[#121212] text-white font-sans flex flex-col items-center p-4 sm:p-6 lg:p-8">
-      <header className="w-full max-w-4xl text-center mb-8">
-        <h1 className="text-4xl sm:text-6xl font-bold tracking-wider text-lime-400">
-          MAXPROMPT
-        </h1>
-      </header>
+    <div className="bg-gray-900 text-white min-h-screen font-sans">
+      <div className="container mx-auto p-4 sm:p-6 md:p-8 max-w-4xl">
+        <header className="text-center mb-8">
+          <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-lime-400 to-green-500">
+            AI Media Generator
+          </h1>
+          <p className="text-gray-400 mt-2 text-lg">
+            Create stunning images and videos with the power of Gemini.
+          </p>
+        </header>
 
-      <main className="w-full max-w-4xl flex flex-col items-center">
-        <div className="w-full max-w-sm p-1.5 bg-[#1F1F1F] rounded-xl flex items-center justify-center gap-2 mb-8">
-          <TabButton
-            label="Generate Image"
-            icon={<ImageIcon className="w-5 h-5" />}
-            isActive={activeTab === GeneratorTab.Image}
-            onClick={() => handleTabChange(GeneratorTab.Image)}
-          />
-          <TabButton
-            label="Generate Video"
-            icon={<VideoIcon className="w-5 h-5" />}
-            isActive={activeTab === GeneratorTab.Video}
-            onClick={() => handleTabChange(GeneratorTab.Video)}
-          />
-        </div>
-
-        <div className="w-full border border-dashed border-gray-700 rounded-2xl p-6 md:p-8">
-            <div className="text-center text-gray-300 mb-6">
-                <p className="text-lg font-bold">Selamat Datang di</p>
-                <p className="text-2xl font-bold text-lime-400 my-1">#TeknologiAkhirZaman</p>
-                <p className="text-gray-400 text-sm">Gunakan AI dengan bijak dan sebaik mungkin</p>
-            </div>
-          <div className={activeTab === GeneratorTab.Image ? 'block' : 'hidden'}>
-            <ImageGenerator />
+        <main>
+          <div className="bg-gray-800 p-2 rounded-lg flex mb-6 max-w-md mx-auto">
+            <TabButton
+              label="Image"
+              icon={<ImageIcon />}
+              isActive={activeTab === GeneratorTab.Image}
+              onClick={() => setActiveTab(GeneratorTab.Image)}
+            />
+            <TabButton
+              label="Video"
+              icon={<VideoIcon />}
+              isActive={activeTab === GeneratorTab.Video}
+              onClick={() => setActiveTab(GeneratorTab.Video)}
+            />
           </div>
-          <div className={activeTab === GeneratorTab.Video ? 'block' : 'hidden'}>
-            <VideoGenerator />
-          </div>
-        </div>
-      </main>
 
-      <footer className="w-full max-w-4xl text-center mt-12 text-gray-500">
-        <p>&copy; {new Date().getFullYear()} MAXPROMPT. Powered by Google Gemini.</p>
-      </footer>
+          <div className="bg-gray-800 p-6 rounded-lg shadow-2xl">
+            {activeTab === GeneratorTab.Image && <ImageGenerator />}
+            {activeTab === GeneratorTab.Video && <VideoGenerator />}
+          </div>
+        </main>
+        
+        <footer className="text-center mt-8 text-gray-500 text-sm">
+            Powered by Google Gemini
+        </footer>
+      </div>
     </div>
   );
 };
