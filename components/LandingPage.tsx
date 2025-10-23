@@ -8,24 +8,24 @@ interface LandingPageProps {
 
 interface ToolCardProps {
   title: string;
-  imgSrc: string;
+  description: string;
   onClick: () => void;
   tag?: string;
   className?: string;
 }
 
-const ToolCard: React.FC<ToolCardProps> = ({ title, imgSrc, tag, onClick, className = '' }) => {
+const ToolCard: React.FC<ToolCardProps> = ({ title, description, tag, onClick, className = '' }) => {
   return (
     <div
       onClick={onClick}
       className={`bg-zinc-800/50 border border-zinc-700/80 rounded-2xl p-4 sm:p-6 flex flex-col group cursor-pointer transition-all duration-300 hover:bg-zinc-800 hover:-translate-y-1 ${className}`}
     >
-      <div className="flex justify-between items-start mb-4">
+      <div className="flex justify-between items-start mb-2">
         <h3 className="font-semibold text-zinc-100 text-base sm:text-lg">{title}</h3>
         {tag && <span className="text-xs bg-green-500 text-zinc-900 font-bold px-2 py-1 rounded-full">{tag}</span>}
       </div>
-      <div className="flex-grow flex items-center justify-center">
-        <img src={imgSrc} alt={title} className="max-h-32 sm:max-h-36 object-contain transition-transform duration-300 group-hover:scale-105" />
+      <div className="flex-grow flex items-start">
+        <p className="text-sm text-zinc-400 text-left">{description}</p>
       </div>
     </div>
   );
@@ -33,11 +33,11 @@ const ToolCard: React.FC<ToolCardProps> = ({ title, imgSrc, tag, onClick, classN
 
 
 const LandingPage: React.FC<LandingPageProps> = ({ onSelectTool, onLoginClick }) => {
-  const tools: { id: AppTab; title: string; tag?: string; imgSrc: string; }[] = [
-    { id: 'studio', title: 'Foto Produk', tag: 'Nano Banana', imgSrc: 'https://i.imgur.com/e5k072P.png' },
-    { id: 'studioPlus', title: 'Foto Produk + Model', tag: 'Baru', imgSrc: 'https://i.imgur.com/Tq5aW2q.png' },
-    { id: 'generate', title: 'Edit Foto AI', tag: 'Imagen 4.0', imgSrc: 'https://i.imgur.com/4zL9yYR.png' },
-    { id: 'video', title: 'Video Pemasaran', tag: 'Veo 3.1', imgSrc: 'https://i.imgur.com/O1b80zR.png' },
+  const tools: { id: AppTab; title: string; tag?: string; description: string; }[] = [
+    { id: 'studio', title: 'Foto Produk', tag: 'Nano Banana', description: 'Unggah foto produk Anda dan biarkan AI mengubahnya menjadi gambar studio profesional.' },
+    { id: 'studioPlus', title: 'Foto Produk + Model', tag: 'Baru', description: 'Gabungkan foto model dan produk Anda untuk membuat foto gaya hidup yang menarik.' },
+    { id: 'generate', title: 'Edit Foto AI', tag: 'Imagen 4.0', description: 'Edit gambar Anda dengan mudah menggunakan perintah teks sederhana.' },
+    { id: 'video', title: 'Video Pemasaran', tag: 'Veo 3.1', description: 'Ubah gambar produk Anda menjadi video pemasaran singkat yang dinamis.' },
   ];
 
   return (
@@ -50,7 +50,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectTool, onLoginClick })
         <h1 className="text-6xl sm:text-7xl font-extrabold tracking-tighter text-green-400 [text-shadow:0_0_10px_theme(colors.green.400/0.8),0_0_20px_theme(colors.green.500/0.6)]">
           MAXPROMPT
         </h1>
-        <p className="mt-3 text-base text-zinc-400 max-w-md mx-auto">
+        <p className="mt-1 text-base text-zinc-400 max-w-md mx-auto">
           Buat produk <span className="text-green-400 font-semibold">UMKM</span> mu jadi kalcer & profesional
         </p>
         
@@ -67,13 +67,17 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectTool, onLoginClick })
             <ToolCard
               key={tool.id}
               title={tool.title}
-              imgSrc={tool.imgSrc}
+              description={tool.description}
               tag={tool.tag}
               onClick={() => onSelectTool(tool.id)}
             />
           ))}
         </div>
       </div>
+
+      <footer className="absolute bottom-1 text-center w-full text-xs text-zinc-500z-20">
+        <p>&copy; {new Date().getFullYear()} MAXPROMPT | dibuat dengan hati by:Maxadam</p>
+      </footer>
     </div>
   );
 };

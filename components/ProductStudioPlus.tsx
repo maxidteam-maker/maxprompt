@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { UploadedFile, AspectRatio } from '../types';
 import { fileToBase64 } from '../utils/fileUtils';
 import { combineImagesWithText, generatePromptForImages } from '../services/geminiService';
@@ -62,28 +62,38 @@ const ProductStudioPlus: React.FC = () => {
 
   const ASPECT_RATIOS: AspectRatio[] = ['1:1', '16:9', '9:16', '4:3', '3:4'];
 
-  const handleGeneratePrompt = async () => {
+  const handleGeneratePrompt = useCallback(async () => {
     if (!modelFile || !productFile || !apiKey) return;
     setIsGeneratingPrompt(true);
     setError(null);
-    setAutoPrompt(null);
+    setAutoPrompt(''); // Clear previous prompt
     try {
         const generated = await generatePromptForImages(modelFile.base64, modelFile.mimeType, productFile.base64, productFile.mimeType, apiKey);
         setAutoPrompt(generated);
     } catch (err) {
-        setError("Could not generate a prompt automatically. Please check your API key or write one manually.");
-        setPromptMode('manual');
+        setAutoPrompt("Error: Could not generate a prompt. Please check your API key or write one manually.");
+        setError("Auto prompt generation failed.");
     } finally {
         setIsGeneratingPrompt(false);
     }
-  };
+  }, [apiKey, modelFile, productFile]);
 
   useEffect(() => {
-    if (modelFile && productFile && promptMode === 'auto' && apiKey) {
+    if (promptMode !== 'auto') return;
+    
+    // Clear previous state when files change in auto mode
+    setAutoPrompt(null);
+    setError(null);
+
+    if (modelFile && productFile) {
+      if (!apiKey) {
+        setAutoPrompt("Error: Please set your API key in the header to use Auto Prompt.");
+        return;
+      }
       handleGeneratePrompt();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelFile, productFile, promptMode, apiKey]);
+  }, [modelFile, productFile, promptMode, apiKey, handleGeneratePrompt]);
+
 
   const handleSubmit = async () => {
     if (!apiKey) {
@@ -92,8 +102,8 @@ const ProductStudioPlus: React.FC = () => {
     }
     const finalPrompt = promptMode === 'auto' ? autoPrompt : manualPrompt;
 
-    if (!modelFile || !productFile || !finalPrompt) {
-      setError("Please upload a model, a product, and ensure there is a prompt.");
+    if (!modelFile || !productFile || !finalPrompt || finalPrompt.startsWith('Error:')) {
+      setError("Please upload a model, a product, and ensure there is a valid prompt.");
       return;
     }
 
@@ -119,6 +129,8 @@ const ProductStudioPlus: React.FC = () => {
       setIsLoading(false);
     }
   };
+  
+  const hasAutoPromptError = autoPrompt?.startsWith('Error:');
 
   return (
     <div className="space-y-6">
@@ -139,7 +151,7 @@ const ProductStudioPlus: React.FC = () => {
                 <button
                   key={mode}
                   onClick={() => setPromptMode(mode)}
-                  className={`px-4 py-2 text-sm rounded-md transition-colors ${
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
                     promptMode === mode
                       ? 'bg-green-500 text-zinc-900 font-semibold'
                       : 'bg-zinc-700 hover:bg-zinc-600 text-zinc-300'
@@ -154,17 +166,19 @@ const ProductStudioPlus: React.FC = () => {
               <div className="relative">
                 <textarea
                   rows={3}
-                  className="w-full bg-zinc-800 border-zinc-700 rounded-md text-zinc-300 resize-none"
+                  className={`w-full bg-zinc-800 border rounded-md resize-none transition-colors ${
+                    hasAutoPromptError ? 'border-red-500/50 text-red-400' : 'border-zinc-700 text-zinc-300'
+                  }`}
                   placeholder={
                     isGeneratingPrompt 
                       ? "Generating creative prompt..." 
                       : (modelFile && productFile ? "Auto-generated prompt will appear here." : "Upload both images to generate a prompt.")
                   }
-                  value={isGeneratingPrompt ? "" : autoPrompt || ''}
+                  value={autoPrompt || ''}
                   readOnly
                 />
                 {(isGeneratingPrompt) && <div className="absolute inset-0 flex items-center justify-center"><Loader text="" /></div>}
-                {autoPrompt && !isGeneratingPrompt && (
+                {autoPrompt && !isGeneratingPrompt && !hasAutoPromptError && (
                   <button onClick={handleGeneratePrompt} className="absolute bottom-2 right-2 text-xs bg-zinc-600 hover:bg-zinc-500 p-1.5 rounded-md">Regenerate</button>
                 )}
               </div>
@@ -199,7 +213,7 @@ const ProductStudioPlus: React.FC = () => {
 
           <button
             onClick={handleSubmit}
-            disabled={isLoading || !modelFile || !productFile || !(promptMode === 'auto' ? autoPrompt : manualPrompt)}
+            disabled={isLoading || !modelFile || !productFile || !(promptMode === 'auto' ? autoPrompt && !hasAutoPromptError : manualPrompt)}
             className="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-semibold text-zinc-900 bg-green-500 hover:bg-green-600 disabled:bg-zinc-700 disabled:text-zinc-400 disabled:cursor-not-allowed"
           >
             <Icon name="sparkles" className="w-5 h-5" />

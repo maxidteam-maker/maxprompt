@@ -18,7 +18,7 @@ const Header: React.FC<HeaderProps> = ({ onLogoClick, onApiKeyClick }) => {
              <div className="bg-green-500 p-1.5 rounded-lg">
                 <Icon name="sparkles" className="w-6 h-6 text-white" />
             </div>
-            <h1 className="text-xl font-bold text-zinc-100 tracking-tight">Product Studio AI</h1>
+            <h1 className="text-xl font-bold text-zinc-100 tracking-tight">MAXPROMPT</h1>
           </div>
           <nav className="flex items-center space-x-4">
              <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors">Help</a>
