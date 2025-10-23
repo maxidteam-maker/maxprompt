@@ -1,55 +1,70 @@
-import React, { useState } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
+import { ApiKeyContext } from '../context/ApiKeyContext';
 
 interface ApiKeyModalProps {
-  onKeySubmit: (apiKey: string) => void;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onKeySubmit }) => {
-  const [apiKey, setApiKey] = useState('');
+const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => {
+  const { apiKey, setApiKey } = useContext(ApiKeyContext);
+  const [localKey, setLocalKey] = useState(apiKey || '');
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (apiKey.trim()) {
-      onKeySubmit(apiKey.trim());
-    }
+  useEffect(() => {
+    setLocalKey(apiKey || '');
+  }, [apiKey, isOpen]);
+
+  const handleSave = () => {
+    setApiKey(localKey);
+    onClose();
+  };
+  
+  const handleClear = () => {
+    setLocalKey('');
+    setApiKey(null);
   };
 
+
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white/10 backdrop-blur-2xl p-6 sm:p-8 rounded-2xl shadow-2xl max-w-md w-full border border-white/20">
-        <h2 className="text-2xl font-bold text-white mb-2">Enter Your Gemini API Key</h2>
-        <p className="text-gray-300 mb-4 text-sm">
-          To use MAXPROMPT, you need a Google Gemini API key. It will be stored securely in your browser.
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div 
+        className="relative bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl w-full max-w-md p-6 sm:p-8"
+        // Prevent clicks inside the modal from closing it
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button onClick={onClose} className="absolute top-4 right-4 text-zinc-500 hover:text-zinc-300 transition-colors">&times;</button>
+        <h2 className="text-2xl font-bold text-zinc-100 mb-4">Set Your Google AI API Key</h2>
+        <p className="text-zinc-400 mb-6 text-sm">
+          To use this application, you need to provide your own Google AI API key. Your key is stored securely in your browser's local storage and is never sent to our servers.
         </p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
+        <div className="space-y-4">
+           <input
             type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            className="w-full px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-lime-500 transition"
-            placeholder="Your Google AI Studio API Key"
-            required
+            value={localKey}
+            onChange={(e) => setLocalKey(e.target.value)}
+            placeholder="Enter your API key here"
+            className="w-full bg-zinc-800 border-zinc-600 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 text-zinc-100 px-4 py-2"
           />
-          <div className="text-xs text-gray-400 bg-gray-900/30 p-3 rounded-lg">
-            <span className="font-bold text-amber-400">Penting:</span> API Key Anda tunduk pada kuota dan batas penggunaan dari Google. Beberapa fitur canggih mungkin memerlukan akun dengan <span className="font-semibold text-white">tagihan (billing) yang aktif</span>.
+          <div className="flex flex-col sm:flex-row gap-3">
+             <button
+              onClick={handleSave}
+              className="flex-1 py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-semibold text-zinc-900 bg-green-500 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:ring-green-500"
+            >
+              Save and Close
+            </button>
+             <button
+              onClick={handleClear}
+              className="flex-1 py-2.5 px-4 rounded-md text-sm font-medium text-zinc-300 bg-zinc-700 hover:bg-zinc-600 focus:outline-none"
+            >
+              Clear Key
+            </button>
           </div>
-          <button
-            type="submit"
-            className="w-full bg-lime-500 hover:bg-lime-600 disabled:bg-gray-600 text-gray-900 font-bold py-2.5 px-4 rounded-lg transition-colors"
-          >
-            Save and Continue
-          </button>
-            <div className="text-center mt-2">
-                <a 
-                href="https://ai.google.dev/gemini-api/docs/api-key" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-sm text-lime-400 hover:text-lime-300 underline"
-                >
-                Bagaimana cara mendapatkan API Key?
-                </a>
-            </div>
-        </form>
+        </div>
+         <p className="text-center text-xs text-zinc-500 mt-6">
+          Don't have a key? Get one from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-green-400 underline">Google AI Studio</a>.
+        </p>
       </div>
     </div>
   );

@@ -1,5 +1,7 @@
 {
-  "name": "MaxPrompt",
-  "description": "Selamat Datang di #TeknologiAkhirZaman. Gunakan AI dengan bijak dan sebaik mungkin.",
-  "requestFramePermissions": []
+  "name": "AI Product Photo Studio",
+  "description": "An AI-powered application to generate professional studio-quality product photos from user-uploaded images. Users can also generate images and videos from text, and analyze visual content using Gemini.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
 }

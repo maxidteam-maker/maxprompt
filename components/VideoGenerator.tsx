@@ -1,144 +1,110 @@
-import React, { useState } from 'react';
-import { generateVideo } from '../services/geminiService';
-import { VideoAspectRatio, VideoResolution } from '../types';
-import FileUpload from './FileUpload';
-import Spinner from './Spinner';
-import { SparklesIcon } from './icons';
+import React, { useState, useContext } from 'react';
+import { UploadedFile } from '../types';
+import { fileToBase64 } from '../utils/fileUtils';
+import { generateVideoFromImage } from '../services/geminiService';
+import Loader from './common/Loader';
+import Icon from './common/Icon';
+import { ApiKeyContext } from '../context/ApiKeyContext';
 
 const VideoGenerator: React.FC = () => {
-  const [prompt, setPrompt] = useState('');
-  const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>(VideoAspectRatio.Landscape);
-  const [resolution, setResolution] = useState<VideoResolution>(VideoResolution.SD);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { apiKey } = useContext(ApiKeyContext);
+  const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
+  const [prompt, setPrompt] = useState<string>('');
+  const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16'>('16:9');
+  const [generatedVideo, setGeneratedVideo] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [resultVideo, setResultVideo] = useState<string | null>(null);
+  
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      try {
+        const base64 = await fileToBase64(file);
+        setUploadedFile({ file, base64, mimeType: file.type });
+        setGeneratedVideo(null);
+        setError(null);
+      } catch (err) {
+        setError("Failed to read file.");
+      }
+    }
+  };
 
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!prompt && !imageFile) {
-      setError('Please enter a prompt or upload an image.');
+  const handleSubmit = async () => {
+    if (!apiKey) {
+      setError("Please set your API key in the header before generating a video.");
       return;
     }
-    setLoading(true);
+    if (!uploadedFile || !prompt) {
+      setError("Please upload an image and enter a prompt.");
+      return;
+    }
+
+    setIsLoading(true);
     setError(null);
-    setResultVideo(null);
+    setGeneratedVideo(null);
 
     try {
-      const videoUrl = await generateVideo(prompt, aspectRatio, resolution, imageFile);
-      setResultVideo(videoUrl);
-    } catch (err) {
-      if (err instanceof Error) {
-          if (err.message.toLowerCase().includes('quota')) {
-              setError('Error: Kuota API Key Anda telah habis atau perlu aktivasi billing di akun Google Cloud Anda. Ini bukan kesalahan aplikasi, silakan periksa detail akun Google Anda.');
-          } else {
-              setError(err.message);
-          }
-      } else {
-          setError('An unknown error occurred.');
-      }
+      const videoUrl = await generateVideoFromImage(uploadedFile.base64, uploadedFile.mimeType, prompt, aspectRatio, apiKey);
+      setGeneratedVideo(videoUrl);
+    } catch (err: any) {
+      setError("Failed to generate video. Please check your API key and try again.");
+      console.error(err);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
     <div className="space-y-6">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <FileUpload 
-          onFileSelect={setImageFile}
-          label="1. Upload Starting Image (Optional)"
-          disabled={loading}
-        />
-
-        <div>
-          <label htmlFor="video-prompt" className="block text-sm font-medium text-gray-300 mb-2">
-            2. Describe the Video to Generate
-          </label>
-          <textarea
-            id="video-prompt"
-            rows={3}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            className="w-full bg-gray-900/50 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-lime-500 focus:outline-none transition"
-            placeholder="e.g., A cinematic shot of a lone astronaut on a red planet"
-            disabled={loading}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Aspect Ratio</label>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.values(VideoAspectRatio).map((ratio) => (
-                <button
-                  key={ratio}
-                  type="button"
-                  onClick={() => setAspectRatio(ratio)}
-                  disabled={loading}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
-                    aspectRatio === ratio
-                      ? 'bg-lime-500 text-gray-900 ring-2 ring-lime-400'
-                      : 'bg-gray-700 hover:bg-gray-600 text-white'
-                  }`}
-                >
-                  {ratio === VideoAspectRatio.Landscape ? '16:9 Landscape' : '9:16 Portrait'}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Resolution</label>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.values(VideoResolution).map((res) => (
-                <button
-                  key={res}
-                  type="button"
-                  onClick={() => setResolution(res)}
-                  disabled={loading}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
-                    resolution === res
-                      ? 'bg-lime-500 text-gray-900 ring-2 ring-lime-400'
-                      : 'bg-gray-700 hover:bg-gray-600 text-white'
-                  }`}
-                >
-                  {res}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading || (!prompt && !imageFile)}
-          className="w-full flex justify-center items-center gap-2 bg-lime-500 hover:bg-lime-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-gray-900 font-bold py-3 px-4 rounded-lg transition-colors"
-        >
-          {loading ? <Spinner className="w-6 h-6" /> : <SparklesIcon className="w-6 h-6" />}
-          {loading ? 'Generating Video...' : 'Generate Video'}
-        </button>
-      </form>
+      <h2 className="text-3xl font-bold text-zinc-100">Image to Video Generator</h2>
+      <p className="text-zinc-400">Bring your product image to life with a short, dynamic video clip.</p>
       
-      {loading && <div className="mt-4 text-lime-300 bg-lime-900/50 p-3 rounded-lg text-center animate-pulse">sabar lur, lagi proses... ini bisa memakan waktu beberapa menit.</div>}
-
-      {error && <div className="mt-4 text-red-300 bg-red-900/50 p-4 rounded-lg text-sm">{error}</div>}
-
-      {resultVideo && (
-        <div className="mt-6 animate-fade-in">
-          <h3 className="text-lg font-semibold mb-2">Result:</h3>
-          <div className="w-full overflow-hidden rounded-lg bg-gray-800/50">
-            <video src={resultVideo} controls autoPlay loop className="w-full h-full object-contain" />
-          </div>
-           <a
-              href={resultVideo}
-              download={`maxprompt_video_${Date.now()}.mp4`}
-              className="mt-4 inline-block w-full text-center bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition"
-            >
-              Download Video
-            </a>
+       {!apiKey && (
+        <div className="bg-zinc-800 border border-yellow-600/50 text-yellow-300 px-4 py-3 rounded-lg relative" role="alert">
+          <strong className="font-bold">Action Required:</strong>
+          <span className="block sm:inline ml-2">Video generation requires an API key. Please click "Set API Key" in the header.</span>
         </div>
       )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-zinc-300">1. Upload Starting Image</label>
+           <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-zinc-700 border-dashed rounded-md">
+            <div className="space-y-1 text-center">
+              <Icon name="upload" className="mx-auto h-12 w-12 text-zinc-500" />
+              <div className="flex text-sm text-zinc-400">
+                <label htmlFor="video-file-upload" className="relative cursor-pointer bg-zinc-900 rounded-md font-medium text-green-400 hover:text-green-300 focus-within:outline-none">
+                  <span>Upload a file</span>
+                  <input id="video-file-upload" type="file" className="sr-only" onChange={handleFileChange} accept="image/*" />
+                </label>
+              </div>
+            </div>
+          </div>
+          {uploadedFile && <img src={URL.createObjectURL(uploadedFile.file)} alt="Uploaded" className="rounded-md max-h-32 mx-auto" />}
+          
+          <label htmlFor="video-prompt" className="block text-sm font-medium text-zinc-300">2. Describe Video Action</label>
+          <textarea id="video-prompt" rows={3} className="w-full bg-zinc-800 border-zinc-700 rounded-md text-zinc-100 focus:ring-green-500 focus:border-green-500" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="e.g., The camera slowly zooms out, revealing a beautiful landscape..."/>
+
+          <label className="block text-sm font-medium text-zinc-300">3. Select Aspect Ratio</label>
+          <div className="flex gap-2">
+            {(['16:9', '9:16'] as const).map(r => 
+                <button key={r} onClick={() => setAspectRatio(r)} className={`px-4 py-2 text-sm rounded-md transition-colors ${aspectRatio === r ? 'bg-green-500 text-zinc-900 font-semibold' : 'bg-zinc-700 hover:bg-zinc-600 text-zinc-300'}`}>{r} {r === '16:9' ? '(Landscape)' : '(Portrait)'}</button>
+            )}
+          </div>
+
+          <button onClick={handleSubmit} disabled={isLoading || !uploadedFile || !prompt || !apiKey} className="w-full flex justify-center items-center gap-2 py-3 px-4 text-sm font-semibold text-zinc-900 bg-green-500 hover:bg-green-600 disabled:bg-zinc-700 disabled:text-zinc-400">
+            <Icon name="video" className="w-5 h-5" />
+            {isLoading ? 'Generating Video...' : 'Generate Video'}
+          </button>
+        </div>
+        
+        <div className="flex items-center justify-center bg-zinc-800/50 rounded-lg min-h-[300px] p-4">
+          {isLoading && <Loader text="Video generation can take a few minutes..." />}
+          {error && <p className="text-red-400">{error}</p>}
+          {generatedVideo && <video src={generatedVideo} controls autoPlay loop className="rounded-lg w-full" />}
+          {!isLoading && !generatedVideo && !error && <p className="text-zinc-500">Your generated video will appear here</p>}
+        </div>
+      </div>
     </div>
   );
 };

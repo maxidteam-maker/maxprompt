@@ -1,21 +1,9 @@
-export enum GeneratorTab {
-  Image = 'image',
-  Video = 'video',
+export type AppTab = 'studio' | 'studioPlus' | 'generate' | 'video' | 'analyze';
+
+export interface UploadedFile {
+  file: File;
+  base64: string;
+  mimeType: string;
 }
 
-export enum ImageAspectRatio {
-  Square = '1:1',
-  Portrait_3_4 = '3:4',
-  Landscape = '16:9',
-  Portrait_9_16 = '9:16',
-}
-
-export enum VideoAspectRatio {
-    Landscape = '16:9',
-    Portrait = '9:16',
-}
-
-export enum VideoResolution {
-    SD = '720p',
-    HD = '1080p',
-}
+export type AspectRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
