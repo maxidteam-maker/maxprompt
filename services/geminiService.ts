@@ -4,31 +4,38 @@ import { AspectRatio } from '../types';
 const getAI = (apiKey: string) => new GoogleGenAI({ apiKey });
 
 /**
- * Generates an image using the Imagen 4.0 model.
+ * Generates an image using the gemini-2.5-flash-image model.
  */
 export const generateImage = async (prompt: string, aspectRatio: AspectRatio, apiKey: string): Promise<string> => {
   const ai = getAI(apiKey);
-  const response = await ai.models.generateImages({
-    model: 'imagen-4.0-generate-001',
-    prompt: prompt,
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-image',
+    contents: {
+      parts: [
+        {
+          text: `${prompt}. Please generate this image with a ${aspectRatio} aspect ratio.`,
+        },
+      ],
+    },
     config: {
-      numberOfImages: 1,
-      outputMimeType: 'image/jpeg',
-      aspectRatio: aspectRatio,
+      responseModalities: [Modality.IMAGE],
     },
   });
 
-  const base64ImageBytes = response.generatedImages[0].image.imageBytes;
-  if (!base64ImageBytes) {
-    throw new Error('No image bytes returned from API.');
+  // Since this model returns one image, we find the first image part.
+  for (const part of response.candidates[0].content.parts) {
+    if (part.inlineData) {
+      return part.inlineData.data;
+    }
   }
-  return base64ImageBytes;
+
+  throw new Error('No image data found in the response.');
 };
 
 /**
  * Edits an image based on a text prompt using the Gemini 2.5 Flash Image model.
  */
-export const editImageWithText = async (base64ImageData: string, mimeType: string, prompt: string, apiKey: string): Promise<string> => {
+export const editImageWithText = async (base64ImageData: string, mimeType: string, prompt: string, apiKey: string): Promise<string[]> => {
   const ai = getAI(apiKey);
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
@@ -47,16 +54,23 @@ export const editImageWithText = async (base64ImageData: string, mimeType: strin
     },
     config: {
       responseModalities: [Modality.IMAGE],
+      candidateCount: 4, // This model supports multiple candidates for editing
     },
   });
 
-  for (const part of response.candidates[0].content.parts) {
-    if (part.inlineData) {
-      return part.inlineData.data;
-    }
+  const images: string[] = [];
+  for(const candidate of response.candidates) {
+      for (const part of candidate.content.parts) {
+        if (part.inlineData) {
+          images.push(part.inlineData.data);
+        }
+      }
   }
 
-  throw new Error('No image data found in the response.');
+  if (images.length === 0) {
+    throw new Error('No image data found in the response.');
+  }
+  return images;
 };
 
 
@@ -106,31 +120,6 @@ export const generateVideoFromImage = async (
 };
 
 /**
- * Analyzes image or video content based on a text prompt using Gemini 2.5 Pro.
- */
-export const analyzeContent = async (base64Data: string, mimeType: string, prompt: string, apiKey: string): Promise<string> => {
-  const ai = getAI(apiKey);
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-pro',
-    contents: {
-      parts: [
-        {
-          inlineData: {
-            data: base64Data,
-            mimeType: mimeType,
-          },
-        },
-        {
-          text: prompt,
-        },
-      ],
-    },
-  });
-
-  return response.text;
-};
-
-/**
  * Combines a model image and a product image with a text prompt.
  */
 export const combineImagesWithText = async (
@@ -141,7 +130,7 @@ export const combineImagesWithText = async (
   prompt: string,
   aspectRatio: AspectRatio,
   apiKey: string
-): Promise<string> => {
+): Promise<string[]> => {
   const ai = getAI(apiKey);
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
@@ -166,16 +155,23 @@ export const combineImagesWithText = async (
     },
     config: {
       responseModalities: [Modality.IMAGE],
+      candidateCount: 4, // This model supports multiple candidates
     },
   });
 
-  for (const part of response.candidates[0].content.parts) {
-    if (part.inlineData) {
-      return part.inlineData.data;
-    }
+  const images: string[] = [];
+  for(const candidate of response.candidates) {
+      for (const part of candidate.content.parts) {
+        if (part.inlineData) {
+          images.push(part.inlineData.data);
+        }
+      }
   }
 
-  throw new Error('No image data found in the response.');
+  if (images.length === 0) {
+    throw new Error('No image data found in the response.');
+  }
+  return images;
 };
 
 
@@ -208,6 +204,37 @@ export const generatePromptForImages = async (
         },
         {
           text: 'You are an expert creative director. Based on the two images provided (a person and a product), write a short, single-sentence prompt to combine them into a professional, photorealistic lifestyle photo. Describe the scene, the model\'s action, and the interaction with the product. For example: "A smiling woman in a bright, modern kitchen, holding and looking at the product."',
+        },
+      ],
+    },
+  });
+
+  return response.text;
+};
+
+// Fix: Added missing analyzeContent function to support the ContentAnalyzer component.
+/**
+ * Analyzes image or video content based on a text prompt.
+ */
+export const analyzeContent = async (
+  base64Data: string,
+  mimeType: string,
+  prompt: string,
+  apiKey: string
+): Promise<string> => {
+  const ai = getAI(apiKey);
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: {
+      parts: [
+        {
+          inlineData: {
+            data: base64Data,
+            mimeType: mimeType,
+          },
+        },
+        {
+          text: prompt,
         },
       ],
     },

@@ -56,7 +56,7 @@ const ProductStudioPlus: React.FC = () => {
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState<boolean>(false);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1');
   
-  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,8 +70,16 @@ const ProductStudioPlus: React.FC = () => {
     try {
         const generated = await generatePromptForImages(modelFile.base64, modelFile.mimeType, productFile.base64, productFile.mimeType, apiKey);
         setAutoPrompt(generated);
-    } catch (err) {
-        setAutoPrompt("Error: Could not generate a prompt. Please check your API key or write one manually.");
+    } catch (err: any) {
+        let errorMessage = "Error: Could not generate a prompt. Please check your API key or write one manually.";
+         if (err && err.message) {
+            if (err.message.includes('suspended')) {
+                errorMessage = "Error: Your API key has been suspended. Please use a valid key.";
+            } else if (err.message.includes('Permission denied')) {
+                errorMessage = "Error: Permission denied. Your API key might not be valid.";
+            }
+        }
+        setAutoPrompt(errorMessage);
         setError("Auto prompt generation failed.");
     } finally {
         setIsGeneratingPrompt(false);
@@ -109,10 +117,10 @@ const ProductStudioPlus: React.FC = () => {
 
     setIsLoading(true);
     setError(null);
-    setGeneratedImage(null);
+    setGeneratedImages([]);
 
     try {
-      const resultBase64 = await combineImagesWithText(
+      const resultBase64Array = await combineImagesWithText(
         modelFile.base64,
         modelFile.mimeType,
         productFile.base64,
@@ -121,9 +129,19 @@ const ProductStudioPlus: React.FC = () => {
         aspectRatio,
         apiKey
       );
-      setGeneratedImage(`data:image/jpeg;base64,${resultBase64}`);
-    } catch (err) {
-      setError("Failed to generate image. Please check your API key and try again.");
+      setGeneratedImages(resultBase64Array.map(b64 => `data:image/jpeg;base64,${b64}`));
+    } catch (err: any {
+      let errorMessage = "Failed to generate image. Please check your API key and try again.";
+       if (err && err.message) {
+        if (err.message.includes('suspended')) {
+          errorMessage = "Your API key has been suspended. Please check its status in your Google Cloud project.";
+        } else if (err.message.includes('Permission denied')) {
+          errorMessage = "Permission denied. Please ensure your API key is valid and has the necessary permissions enabled.";
+        } else if (err.message.includes('API key not valid')) {
+          errorMessage = "The API key you provided is not valid. Please check for typos and try again.";
+        }
+      }
+      setError(errorMessage);
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -224,13 +242,19 @@ const ProductStudioPlus: React.FC = () => {
         <div className="flex items-center justify-center bg-zinc-800/50 rounded-lg min-h-[300px] p-4">
           {isLoading && <Loader text="Placing your product in the scene..." />}
           {error && <p className="text-red-400">{error}</p>}
-          {generatedImage && (
-            <div className="w-full">
-                <img src={generatedImage} alt="Generated lifestyle" className="rounded-lg shadow-2xl w-full" />
-                <a href={generatedImage} download="lifestyle-photo.jpg" className="mt-4 inline-block w-full text-center py-2 px-4 bg-zinc-700 hover:bg-zinc-600 rounded-md text-sm font-medium">Download Image</a>
+          {generatedImages.length > 0 && (
+            <div className="grid grid-cols-2 gap-4">
+              {generatedImages.map((image, index) => (
+                <div key={index} className="relative group">
+                  <img src={image} alt={`Generated variation ${index + 1}`} className="rounded-lg shadow-lg w-full" />
+                  <a href={image} download={`lifestyle-photo-${index + 1}.jpg`} className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-900/50 text-white p-1.5 rounded-full hover:bg-zinc-900">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                  </a>
+                </div>
+              ))}
             </div>
           )}
-          {!isLoading && !generatedImage && !error && (
+          {!isLoading && generatedImages.length === 0 && !error && (
             <p className="text-zinc-500">Your generated lifestyle image will appear here</p>
           )}
         </div>

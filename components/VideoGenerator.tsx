@@ -47,7 +47,17 @@ const VideoGenerator: React.FC = () => {
       const videoUrl = await generateVideoFromImage(uploadedFile.base64, uploadedFile.mimeType, prompt, aspectRatio, apiKey);
       setGeneratedVideo(videoUrl);
     } catch (err: any) {
-      setError("Failed to generate video. Please check your API key and try again.");
+      let errorMessage = "Failed to generate video. Please check your API key and try again.";
+      if (err && err.message) {
+        if (err.message.includes('suspended')) {
+          errorMessage = "Your API key has been suspended. Please check its status in your Google Cloud project.";
+        } else if (err.message.includes('Permission denied')) {
+          errorMessage = "Permission denied. Please ensure your API key is valid and has the necessary permissions enabled.";
+        } else if (err.message.includes('API key not valid')) {
+          errorMessage = "The API key you provided is not valid. Please check for typos and try again.";
+        }
+      }
+      setError(errorMessage);
       console.error(err);
     } finally {
       setIsLoading(false);

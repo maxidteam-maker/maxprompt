@@ -38,8 +38,18 @@ const ImageGenerator: React.FC = () => {
     try {
       const resultBase64 = await generateImage(prompt, aspectRatio, apiKey);
       setGeneratedImage(`data:image/jpeg;base64,${resultBase64}`);
-    } catch (err) {
-      setError("Failed to generate image. Please check your API key and try again.");
+    } catch (err: any) {
+      let errorMessage = "Failed to generate image. Please check your API key and try again.";
+      if (err && err.message) {
+        if (err.message.includes('suspended')) {
+          errorMessage = "Your API key has been suspended. Please check its status in your Google Cloud project.";
+        } else if (err.message.includes('Permission denied')) {
+          errorMessage = "Permission denied. Please ensure your API key is valid and has the necessary permissions enabled.";
+        } else if (err.message.includes('API key not valid')) {
+          errorMessage = "The API key you provided is not valid. Please check for typos and try again.";
+        }
+      }
+      setError(errorMessage);
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -53,7 +63,10 @@ const ImageGenerator: React.FC = () => {
       return (
         <div className="max-w-2xl w-full">
           <img src={generatedImage} alt="Generated from prompt" className="rounded-lg shadow-2xl w-full" />
-          <a href={generatedImage} download="generated-image.jpg" className="mt-4 inline-block w-full text-center py-2 px-4 bg-zinc-700 hover:bg-zinc-600 rounded-md text-sm font-medium">Download Image</a>
+          <div className="mt-4 flex gap-4">
+            <a href={generatedImage} download="generated-image.jpg" className="flex-1 text-center py-2 px-4 bg-zinc-700 hover:bg-zinc-600 rounded-md text-sm font-medium">Download Image</a>
+            <button onClick={() => setGeneratedImage(null)} className="flex-1 text-center py-2 px-4 bg-green-500 hover:bg-green-600 text-zinc-900 rounded-md text-sm font-medium">Generate New Image</button>
+          </div>
         </div>
       );
     }
